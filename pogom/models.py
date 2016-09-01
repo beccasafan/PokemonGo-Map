@@ -8,7 +8,7 @@ import time
 import geopy
 from peewee import SqliteDatabase, InsertQuery, \
     IntegerField, CharField, DoubleField, BooleanField, \
-    DateTimeField, fn, DeleteQuery, CompositeKey, FloatField, SQL, TextField
+    DateTimeField, fn, DeleteQuery, CompositeKey, FloatField, SQL, TextField, BigIntegerField
 from playhouse.flask_utils import FlaskDB
 from playhouse.pool import PooledMySQLDatabase
 from playhouse.shortcuts import RetryOperationalError
@@ -515,6 +515,14 @@ def hex_bounds(center, steps):
     return (n, e, s, w)
 
 
+class RawPokemon(BaseModel):
+    encounter_id = CharField(primary_key=True, max_length=24)
+    spawnpoint_id = CharField(max_length=24)
+    pokemon_id = IntegerField()
+    time_till_hidden_ms = BigIntegerField()
+    timestamp = DateTimeField(default=datetime.utcnow)
+
+
 # todo: this probably shouldn't _really_ be in "models" anymore, but w/e
 def parse_map(args, map_dict, step_location, db_update_queue, wh_update_queue):
     pokemons = {}
@@ -525,6 +533,8 @@ def parse_map(args, map_dict, step_location, db_update_queue, wh_update_queue):
     for cell in cells:
         if config['parse_pokemon']:
             for p in cell.get('wild_pokemons', []):
+                RawPokemon.insert(encounter_id=b64encode(str(p['encounter_id'])), spawnpoint_id=p['spawn_point_id'], pokemon_id=p['pokemon_data']['pokemon_id'], time_till_hidden_ms=p['time_till_hidden_ms']).execute()
+
                 # time_till_hidden_ms was overflowing causing a negative integer.
                 # It was also returning a value above 3.6M ms.
                 if 0 < p['time_till_hidden_ms'] < 3600000:
